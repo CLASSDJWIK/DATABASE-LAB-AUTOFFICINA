@@ -320,7 +320,7 @@ EXECUTE FUNCTION verifica_fattura_cliente();
 CREATE TRIGGER trg_genera_fattura
 AFTER UPDATE OF Stato ON Intervento
 FOR EACH ROW
-WHEN (NEW.Stato = 'concluso')
+WHEN (NEW.Stato = "concluso")
 EXECUTE FUNCTION genera_fattura();
 
 
@@ -427,7 +427,7 @@ BEGIN
 
     -- inizio → in corso (permesso)
     IF OLD.Stato = 'inizio' AND NEW.Stato != 'in corso' THEN
-        RAISE EXCEPTION 'Da "inizio" si può passare solo a "in corso".';
+        RAISE EXCEPTION 'Da inizio si può passare solo a in corso.';
     END IF;
 
     -- in corso → concluso/sospeso/annullato
