@@ -1,22 +1,8 @@
-😎 Hai ragione — *hai l’occhio d’aquila!* 🦅
-Hai chiesto un **file `triggers.sql` completo, strutturato per tabella**, **con TUTTI** i trigger e funzioni UDF come descritto, **in linea col modello E-R**.
-Adesso lo facciamo **davvero BENE e COMPLETO**. 🔧🔨
 
 ---
 
-# ✅ `triggers.sql` COMPLETO — PostgreSQL Autofficina
 
-📦 Contiene:
-
-* Tutte le **funzioni PL/pgSQL**
-* Tutti i **trigger associati**
-* Strutturato per **tabella**, con sezioni chiare
-* Tutti i trigger per i **3 cicli principali**
-* Rispetto dei vincoli, dei flussi di stato e della logica relazionale
-
----
-
-## 📁 STRUTTURA
+-- ## 📁 STRUTTURA
 
 ```sql
 -- =============================================================
@@ -28,7 +14,7 @@ Adesso lo facciamo **davvero BENE e COMPLETO**. 🔧🔨
 
 ---
 
-## 🔹 1. CLIENTE
+-- ## 🔹 1. CLIENTE
 
 ```sql
 -- FUNZIONE: Impedisce eliminazione cliente con auto
@@ -68,7 +54,7 @@ EXECUTE FUNCTION verifica_automobili_cliente_delete();
 
 ---
 
-## 🔹 2. AUTOMOBILE
+-- ## 🔹 2. AUTOMOBILE
 
 ```sql
 -- FUNZIONE: Impedisce cancellazione dell’ultima auto del cliente
@@ -98,7 +84,7 @@ EXECUTE FUNCTION verifica_automobili_cliente_auto();
 
 ---
 
-## 🔹 3. OFFICINA
+-- ## 🔹 3. OFFICINA
 
 ```sql
 -- FUNZIONE: Incrementa numero interventi
@@ -137,7 +123,7 @@ EXECUTE FUNCTION aggiorna_numero_interventi_delete();
 
 ---
 
-## 🔹 4. INTERVENTO
+-- ## 🔹 4. INTERVENTO
 
 ```sql
 -- FUNZIONE: Imposta data_inizio automatica
@@ -226,7 +212,7 @@ EXECUTE FUNCTION log_transizione_stato();
 
 ---
 
-## 🔹 5. FATTURA
+-- ## 🔹 5. FATTURA
 
 ```sql
 -- FUNZIONE: Stato default "non pagata"
@@ -308,7 +294,7 @@ EXECUTE FUNCTION genera_fattura();
 
 ---
 
-## 🔹 6. UTILIZZA
+-- ## 🔹 6. UTILIZZA
 
 ```sql
 -- FUNZIONE: Verifica disponibilità pezzi
@@ -360,7 +346,7 @@ EXECUTE FUNCTION aggiorna_quantita_stoccata();
 
 ---
 
-## 🔹 7. FORNISCE
+-- ## 🔹 7. FORNISCE
 
 ```sql
 -- FUNZIONE: verifica capacità massima magazzino
@@ -412,29 +398,7 @@ EXECUTE FUNCTION aggiorna_stoccato_dopo_fornisce();
 
 ---
 
-✅ **QUESTO È IL `triggers.sql` COMPLETO**, perfettamente compatibile con il tuo schema relazionale.
-
--------------------------------------------------------------------------------------
-
-Hai ragione, 👌 mancano due **pezzi fondamentali** nel blocco `INTERVENTO` del file `triggers.sql`:
-
-1. ✅ **Verifica transizioni di stato** (`verifica_transizione_stato`)
-2. ✅ **Check vincolo logico sul dominio di `Stato`** (workflow delle transizioni valide)
-
-Ora ti fornisco la **versione corretta e completa del blocco INTERVENTO**, con:
-
-* Tutti i vincoli e trigger
-* Tutte le funzioni UDF
-* Workflow delle transizioni ammesso:
-
-  ```
-  Inizio → In Corso → [Sospeso | Annullato | Concluso]
-  Sospeso → In Corso
-  ```
-
----
-
-## 🔧 BLOCCO INTERVENTO COMPLETO — `triggers.sql`
+-- ## 🔧 BLOCCO INTERVENTO COMPLETO — `triggers.sql`
 
 ```sql
 -- =========================
@@ -597,33 +561,251 @@ WHEN (NEW.Stato = 'Concluso')
 EXECUTE FUNCTION genera_fattura();
 ```
 
----
-
-## 🧠 Workflow Stato Intervento (Check logico)
-
-> *Questa funzione verifica solo transizioni logiche valide:*
 
 ```
-"Inizio"     ➝ "In Corso"
-"In Corso"   ➝ "Sospeso" | "Annullato" | "Concluso"
-"Sospeso"    ➝ "In Corso"
-["Annullato", "Concluso"] ➝ ❌ blocco
+  -- =========================
+-- LOG TRANSIZIONI DI STATO
+-- [TABELLE: Intervento, Intervento_Stato_Log]
+-- =========================
+CREATE TABLE IF NOT EXISTS Intervento_Stato_Log (
+    Nome_Officina VARCHAR(50),
+    Numero_Intervento VARCHAR(10),
+    Stato_Precedente VARCHAR(20),
+    Stato_Nuovo VARCHAR(20),
+    Data_Ora TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE OR REPLACE FUNCTION log_transizione_stato()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.Stato IS DISTINCT FROM OLD.Stato THEN
+        INSERT INTO Intervento_Stato_Log (Nome_Officina, Numero_Intervento, Stato_Precedente, Stato_Nuovo)
+        VALUES (NEW.Nome_Officina, NEW.Numero_Intervento, OLD.Stato, NEW.Stato);
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_log_transizione_stato
+AFTER UPDATE OF Stato ON Intervento
+FOR EACH ROW
+EXECUTE FUNCTION log_transizione_stato();
+
+-- =========================
+-- VALIDAZIONE WORKFLOW STATI INTERVENTO
+-- [TABELLA: Intervento]
+-- =========================
+CREATE OR REPLACE FUNCTION verifica_transizione_stato()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Da 'inizio' solo a 'in corso'
+    IF OLD.Stato = 'inizio' AND NEW.Stato NOT IN ('in corso') THEN
+        RAISE EXCEPTION 'Da "inizio" si può solo passare a "in corso".';
+    -- Da 'in corso' a 'sospeso', 'concluso', 'annullato'
+    ELSIF OLD.Stato = 'in corso' AND NEW.Stato NOT IN ('sospeso', 'concluso', 'annullato') THEN
+        RAISE EXCEPTION 'Da "in corso" si può solo passare a "sospeso", "concluso" o "annullato".';
+    -- Da 'sospeso' a 'in corso', 'concluso', 'annullato'
+    ELSIF OLD.Stato = 'sospeso' AND NEW.Stato NOT IN ('in corso', 'concluso', 'annullato') THEN
+        RAISE EXCEPTION 'Da "sospeso" si può solo passare a "in corso", "concluso" o "annullato".';
+    -- Da 'concluso' o 'annullato' non si passa a nessun altro stato
+    ELSIF OLD.Stato IN ('concluso', 'annullato') AND NEW.Stato != OLD.Stato THEN
+        RAISE EXCEPTION 'Intervento già chiuso: non puoi cambiare stato.';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_verifica_transizione_stato
+BEFORE UPDATE OF Stato ON Intervento
+FOR EACH ROW
+EXECUTE FUNCTION verifica_transizione_stato();
+
+-- =========================
+-- UNICITÀ INTERVENTO ATTIVO PER AUTO
+-- [TABELLA: Intervento]
+-- =========================
+CREATE OR REPLACE FUNCTION verifica_intervento_unico_auto()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.Stato IN ('inizio', 'in corso', 'sospeso') THEN
+        IF EXISTS (
+            SELECT 1 FROM Intervento
+            WHERE Targa = NEW.Targa
+            AND Stato IN ('inizio', 'in corso', 'sospeso')
+            AND (Nome_Officina, Numero_Intervento) <> (NEW.Nome_Officina, NEW.Numero_Intervento)
+        ) THEN
+            RAISE EXCEPTION 'Non è possibile avere più di un intervento attivo per la stessa automobile (%).', NEW.Targa;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_verifica_intervento_unico_auto
+BEFORE INSERT OR UPDATE OF Stato ON Intervento
+FOR EACH ROW
+EXECUTE FUNCTION verifica_intervento_unico_auto();
+
+-- =========================
+-- GESTIONE TENTATIVI E SOSPENSIONE/ANNULLAMENTO
+-- [TABELLA: Intervento, Utilizza, Stoccato]
+-- =========================
+-- Si assume che Intervento abbia colonna Tentativi INT DEFAULT 0
+
+CREATE OR REPLACE FUNCTION gestisci_tentativi_e_sospensione()
+RETURNS TRIGGER AS $$
+DECLARE
+    tentativi_correnti INT;
+BEGIN
+    -- Se non ci sono pezzi disponibili, incrementa tentativi e sospendi/annulla
+    IF NEW.Stato = 'in corso' AND NOT verifica_pezzi_disponibili(NEW.Nome_Officina, NEW.Numero_Intervento) THEN
+        SELECT Tentativi INTO tentativi_correnti
+        FROM Intervento
+        WHERE Nome_Officina = NEW.Nome_Officina AND Numero_Intervento = NEW.Numero_Intervento;
+
+        IF tentativi_correnti + 1 >= 3 THEN
+            UPDATE Intervento
+            SET Tentativi = Tentativi + 1,
+                Stato = 'annullato'
+            WHERE Nome_Officina = NEW.Nome_Officina AND Numero_Intervento = NEW.Numero_Intervento;
+        ELSE
+            UPDATE Intervento
+            SET Tentativi = Tentativi + 1,
+                Stato = 'sospeso'
+            WHERE Nome_Officina = NEW.Nome_Officina AND Numero_Intervento = NEW.Numero_Intervento;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+---
+
+
+## 1. Trigger per gestire tentativi e sospensione
+
+```sql
+-- [TABELLA: Intervento, Utilizza, Stoccato]
+-- Gestisce i tentativi e cambia stato in base alla disponibilità pezzi
+CREATE OR REPLACE FUNCTION gestisci_tentativi_e_sospensione()
+RETURNS TRIGGER AS $$
+DECLARE
+    tentativi_correnti INT;
+BEGIN
+    -- Se non ci sono pezzi disponibili, incrementa tentativi e sospendi/annulla
+    IF NEW.Stato = 'in corso' AND NOT verifica_pezzi_disponibili(NEW.Nome_Officina, NEW.Numero_Intervento) THEN
+        SELECT Tentativi INTO tentativi_correnti
+        FROM Intervento
+        WHERE Nome_Officina = NEW.Nome_Officina AND Numero_Intervento = NEW.Numero_Intervento;
+
+        IF tentativi_correnti + 1 >= 3 THEN
+            UPDATE Intervento
+            SET Tentativi = Tentativi + 1,
+                Stato = 'annullato'
+            WHERE Nome_Officina = NEW.Nome_Officina AND Numero_Intervento = NEW.Numero_Intervento;
+        ELSE
+            UPDATE Intervento
+            SET Tentativi = Tentativi + 1,
+                Stato = 'sospeso'
+            WHERE Nome_Officina = NEW.Nome_Officina AND Numero_Intervento = NEW.Numero_Intervento;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_gestisci_tentativi_e_sospensione
+AFTER UPDATE OF Stato ON Intervento
+FOR EACH ROW
+WHEN (NEW.Stato = 'in corso')
+EXECUTE FUNCTION gestisci_tentativi_e_sospensione();
 ```
 
----
 
-### ✅ Adesso l'intervento è **perfettamente gestito**:
+CREATE OR REPLACE FUNCTION verifica_pezzi_disponibili(nome_officina VARCHAR, numero_intervento VARCHAR)
+RETURNS BOOLEAN AS $$
+DECLARE
+    tutti_disponibili BOOLEAN := TRUE;
+    pezzo_record RECORD;
+    quantita_disponibile INTEGER;
+    magazzino_id INTEGER;
+BEGIN
+    -- Trova ID magazzino dell'
+    SELECT ID_MG INTO magazzino_id
+    FROM Magazzino
+    WHERE Nome_Officina = nome_officina;
+    
+    -- Controlla ogni pezzo richiesto
+    FOR pezzo_record IN 
+        SELECT Codice_Pezzo, Quantita
+        FROM Utilizza
+        WHERE Nome_Officina = nome_officina 
+          AND Numero_Intervento = numero_intervento
+    LOOP
+        -- Verifica disponibilità
+        SELECT Quantita INTO quantita_disponibile
+        FROM Stoccato
+        WHERE ID_MG = magazzino_id
+          AND Nome_Officina = nome_officina
+          AND Codice_Pezzo = pezzo_record.Codice_Pezzo;
+        
+        -- Se non disponibile o insufficiente
+        IF quantita_disponibile IS NULL OR quantita_disponibile annullato
+    IF OLD.Stato = 'sospeso' AND NEW.Stato = 'annullato' THEN
+        -- Verifica se ha superato i tentativi massimi
+        IF (SELECT Tentativi FROM Intervento 
+            WHERE Nome_Officina = NEW.Nome_Officina 
+            AND Numero_Intervento = NEW.Numero_Intervento) >= 3 THEN
+            -- OK, può essere annullato
+            RETURN NEW;
+        ELSE
+            RAISE EXCEPTION 'Non puoi annullare un intervento sospeso prima di 3 tentativi.';
+        END IF;
+    END IF;
+    
+    -- Gestione transizione sospeso->concluso
+    IF OLD.Stato = 'sospeso' AND NEW.Stato = 'concluso' THEN
+        -- Verifica se tutti i pezzi sono disponibili
+        IF verifica_pezzi_disponibili(NEW.Nome_Officina, NEW.Numero_Intervento) THEN
+            -- OK, può essere concluso
+            RETURN NEW;
+        ELSE
+            RAISE EXCEPTION 'Non puoi concludere un intervento sospeso se mancano ancora pezzi.';
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
-| UDF/Trigger                      | Funzione                 |
-| -------------------------------- | ------------------------ |
-| `set_data_inizio_automatica`     | Auto data iniziale       |
-| `aggiorna_numero_intervento`     | Progressivo per officina |
-| `verifica_intervento_unico_auto` | Nessun doppio attivo     |
-| `verifica_transizione_stato`     | Stato logico             |
-| `log_transizione_stato`          | Log degli stati          |
-| `genera_fattura`                 | Fattura automatica       |
+CREATE TRIGGER trg_gestisci_workflow_intervento
+BEFORE UPDATE OF Stato ON Intervento
+FOR EACH ROW
+EXECUTE FUNCTION gestisci_workflow_intervento();
+```
 
----
+## 4. Trigger per garantire cliente-automobile
 
-📦 Vuoi che rigeneri il **`triggers.sql` completo con questa versione aggiornata**?
-Dimmi: **“Rigenera tutto in ZIP”** oppure chiedi solo la parte che vuoi 👇
+```sql
+-- [TABELLA: Cliente, Automobile]
+-- Garantisce che ogni cliente abbia almeno un'automobile
+CREATE OR REPLACE FUNCTION verifica_cliente_automobile()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM Automobile
+        WHERE Codice_Fiscale = NEW.Codice_Fiscale
+    ) THEN
+        RAISE EXCEPTION 'Ogni cliente deve avere almeno un''automobile associata.';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_verifica_cliente_automobile
+AFTER INSERT ON Cliente
+FOR EACH ROW
+EXECUTE FUNCTION verifica_cliente_automobile();
+```
+
+
+
