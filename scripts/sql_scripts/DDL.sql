@@ -15,6 +15,10 @@ CHECK (VALUE ~ '^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[0-9]Z[0-9]{3}$');
 CREATE DOMAIN PIVA AS VARCHAR(11) CHECK (VALUE ~ '^[A-Z]{3}[A-Z]{3}[0-9]{5}$');
 
 CREATE DOMAIN CAP AS CHAR(5) CHECK (VALUE ~ '^[0-9]{5}$'); 
+
+CREATE DOMAIN stato_fattura AS VARCHAR(20)
+    CHECK (VALUE IN ('Pagata', 'Non Pagata'));
+
 -- =========================
 -- TABELLE DI RIFERIMENTO
 -- =========================
@@ -92,7 +96,7 @@ INSERT INTO Nazione (Codice, Nome, Continente) VALUES
 ('Z405', 'Messico', 'America'),
 ('Z406', 'Cile', 'America'),
 ('Z407', 'Colombia', 'America'),
-('Z408', 'Perù', 'America'),
+('Z408', 'Peru', 'America'),
 ('Z409', 'Cuba', 'America'),
 ('Z410', 'Bolivia', 'America'),
 -- Oceania
@@ -105,27 +109,17 @@ CREATE TABLE Citta_FVG (
     Nome VARCHAR(50) PRIMARY KEY
 );
 
+
+
+
+
+-- Inserting data into Citta_FVG table
 INSERT INTO Citta_FVG (Nome) VALUES
-('Trieste'),
-('Udine'),
-('Gorizia'),
-('Pordenone'),
-('Monfalcone'),
-('Cividale del Friuli'),
-('Aquileia'),
-('Lignano Sabbiadoro'),
-('Sauris'),
-('Forni di Sopra'),
-('Villa Santina'),
-('Aptia'),
-('Tavagnacco'),
-('Adegliaco'),
-('San Daniele del Friuli'),
-('Buttrio'),
-('Latisana'),
-('Codroipo'),
-('Tricesimo'),
-('Spilimbergo');
+('Trieste'), ('Udine'), ('Pordenone'), ('Gorizia'), ('Monfalcone'), ('Aquileia'), ('Codroipo'),
+('Cividale del Friuli'), ('Tolmezzo'), ('Maniago'), ('Codroipo'), ('San Daniele del Friuli'),
+('Palmanova'), ('Sacile'), ('Latisana'), ('Gemona'), ('Spilimbergo'), ('Tricesimo'), ('Tavagnacco'),
+('Adegliaco'), ('Tarvisio'), ('Cervignano del Friuli'), ('Azzano Decimo'), ('San Vito al Tagliamento'),
+('Lignano Sabbiadoro'), ('Fagagna'), ('Buttrio'), ('Pasian di Prato'), ('San Giorgio di Nogaro');
 
 -- =========================
 -- TABELLE PRINCIPALI
@@ -226,6 +220,23 @@ CREATE TABLE Intervento (
     FOREIGN KEY (Targa) REFERENCES Automobile(Targa) ON DELETE CASCADE
 );
 
+-- Table for managing interventions
+CREATE TABLE Intervento (
+    Nome_Officina VARCHAR(50) NOT NULL,
+    Numero_Intervento VARCHAR(10) NOT NULL,
+    Data_Inizio DATE NOT NULL,
+    Data_Fine DATE,
+    Stato stato_intervento NOT NULL,
+    Tentativi INT DEFAULT 0,
+    Targa targa_auto NOT NULL,
+    Costo_orario DECIMAL(10, 2) NOT NULL,
+    Ore_Manodopera OrePositive NOT NULL,
+    Tipologia VARCHAR(50) NOT NULL,
+    PRIMARY KEY (Nome_Officina, Numero_Intervento),
+    FOREIGN KEY (Nome_Officina) REFERENCES Officina(Nome_Officina),
+    FOREIGN KEY (Targa) REFERENCES Automobile(Targa)
+);
+
 CREATE TABLE Utilizza (
     Nome_Officina VARCHAR(50) NOT NULL,
     Numero_Intervento VARCHAR(10) NOT NULL,
@@ -253,30 +264,80 @@ CREATE TABLE Fattura (
 -- PEZZI DI RICAMBIO PREDEFINITI
 -- =========================
 
-INSERT INTO Pezzo_Ricambio (Codice_Pezzo, Nome, Categoria, Costo_Unitario)
-VALUES
-('PR001', 'Filtro dell''olio', 'Motore', 10.00),
-('PR002', 'Filtro dell''aria', 'Motore', 8.00),
-('PR003', 'Filtro del carburante', 'Motore', 12.00),
-('PR004', 'Pastiglie dei freni', 'Freni', 25.00),
-('PR005', 'Dischi dei freni', 'Freni', 60.00),
-('PR006', 'Batteria', 'Elettricità', 120.00),
-('PR007', 'Cinghia di distribuzione', 'Motore', 50.00),
-('PR008', 'Cinghia dei servizi', 'Motore', 30.00),
-('PR009', 'Candele di accensione', 'Motore', 15.00),
-('PR010', 'Ammortizzatori', 'Sospensione', 80.00),
-('PR011', 'Bracci oscillanti', 'Sospensione', 45.00),
-('PR012', 'Giunti sferici', 'Sospensione', 35.00),
+INSERT INTO Pezzo_Ricambio (Codice_Pezzo, Nome, Categoria, Costo_Unitario) VALUES
+('PR001', 'Filtro olio', 'Motore', 12.00),
+('PR002', 'Filtro aria', 'Motore', 10.00),
+('PR003', 'Filtro carburante', 'Motore', 15.00),
+('PR004', 'Pastiglie freno', 'Freni', 25.00),
+('PR005', 'Dischi freno', 'Freni', 60.00),
+('PR006', 'Batteria', 'Elettrico', 110.00),
+('PR007', 'Cinghia distribuzione', 'Motore', 55.00),
+('PR008', 'Cinghia servizi', 'Motore', 30.00),
+('PR009', 'Candela accensione', 'Motore', 9.00),
+('PR010', 'Ammortizzatore', 'Sospensioni', 80.00),
+('PR011', 'Braccio oscillante', 'Sospensioni', 45.00),
+('PR012', 'Giunto sferico', 'Sospensioni', 35.00),
 ('PR013', 'Radiatore', 'Raffreddamento', 90.00),
 ('PR014', 'Termostato', 'Raffreddamento', 20.00),
-('PR015', 'Pompa dell''acqua', 'Raffreddamento', 40.00),
-('PR016', 'Alternatore', 'Elettricità', 150.00),
-('PR017', 'Motorino di avviamento', 'Elettricità', 130.00),
-('PR018', 'Sensore ossigeno', 'Motore', 20.00),
-('PR019', 'Bobina di accensione', 'Motore', 25.00),
-('PR020', 'Filtro dell''abitacolo', 'Climatizzazione', 10.00);
+('PR015', 'Pompa acqua', 'Raffreddamento', 40.00),
+('PR016', 'Alternatore', 'Elettrico', 150.00),
+('PR017', 'Motorino avviamento', 'Elettrico', 130.00),
+('PR018', 'Sensore ossigeno', 'Motore', 22.00),
+('PR019', 'Bobina accensione', 'Motore', 28.00),
+('PR020', 'Filtro abitacolo', 'Climatizzazione', 13.00),
+('PR021', 'Pompa carburante', 'Motore', 85.00),
+('PR022', 'Faro anteriore', 'Carrozzeria', 65.00),
+('PR023', 'Specchietto retrovisore', 'Carrozzeria', 40.00),
+('PR024', 'Paraurti', 'Carrozzeria', 110.00),
+('PR025', 'Centralina motore', 'Elettronica', 210.00),
+('PR026', 'Kit frizione', 'Trasmissione', 180.00),
+('PR027', 'Volano', 'Trasmissione', 120.00),
+('PR028', 'Mozzo ruota', 'Ruote', 60.00),
+('PR029', 'Cuscinetto ruota', 'Ruote', 25.00),
+('PR030', 'Tirante sterzo', 'Sterzo', 35.00),
+('PR031', 'Testina sterzo', 'Sterzo', 18.00),
+('PR032', 'Sonda lambda', 'Scarico', 75.00),
+('PR033', 'Marmitta', 'Scarico', 140.00),
+('PR034', 'Catalizzatore', 'Scarico', 220.00),
+('PR035', 'Tubo scarico', 'Scarico', 55.00),
+('PR036', 'Ventola radiatore', 'Raffreddamento', 45.00),
+('PR037', 'Compressore clima', 'Climatizzazione', 160.00),
+('PR038', 'Evaporatore', 'Climatizzazione', 120.00),
+('PR039', 'Resistenza ventola', 'Climatizzazione', 35.00),
+('PR040', 'Serbatoio carburante', 'Alimentazione', 200.00),
+('PR041', 'Iniettore', 'Alimentazione', 95.00),
+('PR042', 'Pompa freno', 'Freni', 55.00),
+('PR043', 'Pinza freno', 'Freni', 70.00),
+('PR044', 'Tubo freno', 'Freni', 18.00),
+('PR045', 'Sensore ABS', 'Freni', 40.00),
+('PR046', 'Cavo candela', 'Motore', 8.00),
+('PR047', 'Valvola EGR', 'Motore', 110.00),
+('PR048', 'Carter olio', 'Motore', 65.00),
+('PR049', 'Coperchio punterie', 'Motore', 55.00),
+('PR050', 'Guarnizione testata', 'Motore', 45.00);
 
 -- =========================
 -- FINE DDL.SQL
 -- =========================
 
+-- Table for logging intervention state transitions
+CREATE TABLE Intervento_Stato_Log (
+    Numero_Intervento INT NOT NULL,
+    Nome_Officina VARCHAR(50) NOT NULL,
+    Stato_Precedente VARCHAR(20) NOT NULL,
+    Stato_Successivo VARCHAR(20) NOT NULL,
+    Data_Transizione TIMESTAMP NOT NULL,
+    FOREIGN KEY (Numero_Intervento, Nome_Officina) REFERENCES Intervento(Numero_Intervento, Nome_Officina)
+);
+
+-- Table for managing supply requests
+CREATE TABLE Richiesta_Fornitura (
+    ID_Richiesta SERIAL PRIMARY KEY,
+    Codice_Pezzo VARCHAR(10) NOT NULL,
+    ID_MG INT NOT NULL,
+    Quantita INT NOT NULL,
+    Stato VARCHAR(20) NOT NULL,
+    Data_Richiesta TIMESTAMP NOT NULL,
+    FOREIGN KEY (Codice_Pezzo) REFERENCES Pezzo_Ricambio(Codice_Pezzo),
+    FOREIGN KEY (ID_MG) REFERENCES Magazzino(ID_MG)
+);
