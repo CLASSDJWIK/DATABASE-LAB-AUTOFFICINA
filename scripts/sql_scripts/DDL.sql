@@ -316,19 +316,9 @@ INSERT INTO Pezzo_Ricambio (Codice_Pezzo, Nome, Categoria, Costo_Unitario) VALUE
 ('PR049', 'Coperchio punterie', 'Motore', 55.00),
 ('PR050', 'Guarnizione testata', 'Motore', 45.00);
 
--- =========================
--- FINE DDL.SQL
--- =========================
 
--- Table for logging intervention state transitions
-CREATE TABLE Intervento_Stato_Log (
-    Numero_Intervento INT NOT NULL,
-    Nome_Officina VARCHAR(50) NOT NULL,
-    Stato_Precedente VARCHAR(20) NOT NULL,
-    Stato_Successivo VARCHAR(20) NOT NULL,
-    Data_Transizione TIMESTAMP NOT NULL,
-    FOREIGN KEY (Numero_Intervento, Nome_Officina) REFERENCES Intervento(Numero_Intervento, Nome_Officina)
-);
+
+
 
 -- Table for managing supply requests
 CREATE TABLE Richiesta_Fornitura (
@@ -341,3 +331,9 @@ CREATE TABLE Richiesta_Fornitura (
     FOREIGN KEY (Codice_Pezzo) REFERENCES Pezzo_Ricambio(Codice_Pezzo),
     FOREIGN KEY (ID_MG) REFERENCES Magazzino(ID_MG)
 );
+
+
+
+-- =========================
+-- FINE DDL.SQL
+-- =========================
