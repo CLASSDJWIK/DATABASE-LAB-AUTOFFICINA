@@ -179,7 +179,7 @@ BEGIN
         importo := calcola_importo_fattura(NEW.Numero_Intervento, NEW.Nome_Officina);
         SELECT a.Codice_Fiscale INTO cf
         FROM Automobile a WHERE a.Targa = NEW.Targa;
-        INSERT INTO Fattura (Data_Emissione, Nome_Officina, Numero_Intervento, Importo_Totale, Codice_Fiscale, Stato)
+        INSERT INTO Fattura (Data_Emissione, Nome_Officina, Numero_Intervento, Importo, Codice_Fiscale, Stato)
         VALUES (CURRENT_DATE, NEW.Nome_Officina, NEW.Numero_Intervento, importo, cf, 'Non Pagata');
     END IF;
     RETURN NEW;
