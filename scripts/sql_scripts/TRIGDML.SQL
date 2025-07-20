@@ -174,16 +174,32 @@ RETURNS TRIGGER AS $$
 DECLARE
     importo NUMERIC;
     cf VARCHAR(16);
+    costo_pezzi NUMERIC;
 BEGIN
-    IF NEW.Stato = 'concluso' AND OLD.Stato != 'concluso' THEN
-        importo := calcola_importo_fattura(NEW.Numero_Intervento, NEW.Nome_Officina);
+    IF NEW.Stato = 'Concluso' AND OLD.Stato != 'Concluso' THEN
+        -- Calcola pezzi di ricambio
+        SELECT COALESCE(SUM(pr.Costo_Unitario * u.quantita), 0)
+        INTO costo_pezzi
+        FROM Utilizza u
+        JOIN Pezzo_Ricambio pr ON u.Codice_Pezzo = pr.Codice_Pezzo
+        WHERE u.Nome_Officina = NEW.Nome_Officina
+          AND u.Numero_Intervento = NEW.Numero_Intervento;
+
+        -- Calcola totale (manodopera + ricambi)
+        importo := (NEW.Ore_Manodopera * NEW.Costo_Orario) + costo_pezzi;
+
+        -- Recupera codice fiscale cliente
         SELECT a.Codice_Fiscale INTO cf
-        FROM Automobile a WHERE a.Targa = NEW.Targa;
-        INSERT INTO Fattura (Data_Emissione, Nome_Officina, Numero_Intervento, Importo, Codice_Fiscale, Stato)
+        FROM Automobile a
+        WHERE a.Targa = NEW.Targa;
+
+        -- Inserisce la fattura
+        INSERT INTO Fattura (Data_Emissione, Nome_Officina, Numero_Intervento, Importo_Totale, Codice_Fiscale, Stato)
         VALUES (CURRENT_DATE, NEW.Nome_Officina, NEW.Numero_Intervento, importo, cf, 'Non Pagata');
     END IF;
     RETURN NEW;
 END; $$ LANGUAGE plpgsql;
+
 
 CREATE TRIGGER trg_genera_fattura
 AFTER UPDATE OF Stato ON Intervento
