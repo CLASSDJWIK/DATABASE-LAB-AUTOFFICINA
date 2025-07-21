@@ -3,17 +3,17 @@
 -- DOMINI
 -- =========================
 CREATE DOMAIN Telefono AS VARCHAR(15) CHECK (VALUE ~ '^[0-9+]{6,15}$');
-CREATE DOMAIN AnnoAuto AS INT CHECK (VALUE BETWEEN 1900 AND 2025);
+CREATE DOMAIN AnnoAuto AS INT CHECK (VALUE BETWEEN 1970 AND 2025);
 CREATE DOMAIN Costo AS NUMERIC(10, 2) CHECK (VALUE > 0);
 CREATE DOMAIN OrePositive AS NUMERIC(5, 2) CHECK (VALUE > 0);
 CREATE DOMAIN Targa_Auto AS VARCHAR(7) CHECK (VALUE ~ '^[A-Z]{2}[0-9]{3}[A-Z]{2}$');
 
 CREATE DOMAIN Codice_Fisc AS VARCHAR(16) 
-CHECK (VALUE ~ '^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[0-9]Z[0-9]{3}$'); 
+   CHECK (VALUE ~ '^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[0-9]Z[0-9]{3}$'); 
+CREATE DOMAIN stato_intervento AS VARCHAR(20)
+    CHECK (VALUE IN ('Inizio', 'In Corso', 'Sospeso', 'Annullato', 'Concluso'));
 
-
-CREATE DOMAIN PIVA AS VARCHAR(11) CHECK (VALUE ~ '^[A-Z]{3}[0-9]{8}$');
-
+CREATE DOMAIN PIVA AS VARCHAR(11) CHECK (VALUE ~ '^[A-Z]{3}[0-9]{5}$');
 
 
 CREATE DOMAIN CAP AS CHAR(5) CHECK (VALUE ~ '^[0-9]{5}$'); 
@@ -111,10 +111,6 @@ CREATE TABLE Citta_FVG (
     Nome VARCHAR(50) PRIMARY KEY
 );
 
-
-
-
-
 -- Inserting data into Citta_FVG table
 INSERT INTO Citta_FVG (Nome) VALUES
 ('Trieste'), ('Udine'), ('Pordenone'), ('Gorizia'), ('Monfalcone'), ('Aquileia'), ('Codroipo'),
@@ -140,7 +136,7 @@ CREATE TABLE Cliente (
 
 CREATE TABLE Automobile (
     Targa Targa_Auto PRIMARY KEY,
-    Anno INT NOT NULL,
+    Anno AnnoAuto NOT NULL,
     Modello_Marca VARCHAR(50) NOT NULL,
     Codice_Fiscale Codice_Fisc NOT NULL
     Chilometraggio INT NOT NULL
@@ -155,14 +151,14 @@ CREATE TABLE Officina (
     Citta VARCHAR(50) NOT NULL,
     CAP CAP NOT NULL,
     Telefono Telefono NOT NULL,
-    Numero_Interventi INT DEFAULT 0,
+    Numero_Interventi INTEGER NOT NULL DEFAULT 0 CHECK (Numero_Interventi >= 0),
     FOREIGN KEY (Citta) REFERENCES Citta_FVG(Nome)
 );
 
 CREATE TABLE Magazzino (
     ID_MG SERIAL,
     Nome_Officina VARCHAR(50) NOT NULL,
-    Capacita INT NOT NULL,
+    Capacita INTEGER NOT NULL CHECK (Capacita > 0),
     PRIMARY KEY (ID_MG, Nome_Officina),
     FOREIGN KEY (Nome_Officina) REFERENCES Officina(Nome_Officina) ON DELETE CASCADE
 );
@@ -178,7 +174,7 @@ CREATE TABLE Stoccato (
     ID_MG INT NOT NULL,
     Nome_Officina VARCHAR(50) NOT NULL,
     Codice_Pezzo VARCHAR(10) NOT NULL,
-    Quantita INT NOT NULL,
+    Quantita INTEGER NOT NULL CHECK (Quantita >= 0),
     PRIMARY KEY (ID_MG, Nome_Officina, Codice_Pezzo),
     FOREIGN KEY (ID_MG, Nome_Officina) REFERENCES Magazzino(ID_MG, Nome_Officina) ON DELETE CASCADE,
     FOREIGN KEY (Codice_Pezzo) REFERENCES Pezzo_Ricambio(Codice_Pezzo) ON DELETE CASCADE
@@ -190,13 +186,15 @@ CREATE TABLE Fornitore (
     Indirizzo VARCHAR(100) NOT NULL,
     Citta VARCHAR(50) NOT NULL,
     CAP CAP NOT NULL,
-    Telefono Telefono NOT NULL
+    Telefono Telefono NOT NULL,
+    Prefisso VARCHAR(3) NOT NULL,
+    FOREIGN KEY (Prefisso) REFERENCES Nazione(Codice)
 );
 
 CREATE TABLE Fornisce (
     PIVA PIVA NOT NULL,
     Codice_Pezzo VARCHAR(10) NOT NULL,
-    Quantita INT NOT NULL,
+    Quantita INTEGER NOT NULL CHECK (Quantita > 0),
     Data_Consegna DATE NOT NULL,
     ID_MG INT NOT NULL,
     Nome_Officina VARCHAR(50) NOT NULL,
@@ -219,31 +217,20 @@ CREATE TABLE Intervento (
     Descrizione TEXT,
     PRIMARY KEY (Nome_Officina, Numero_Intervento),
     FOREIGN KEY (Nome_Officina) REFERENCES Officina(Nome_Officina) ON DELETE CASCADE,
-    FOREIGN KEY (Targa) REFERENCES Automobile(Targa) ON DELETE CASCADE
+    FOREIGN KEY (Targa) REFERENCES Automobile(Targa) ON DELETE CASCADE,
+    CONSTRAINT check_stato_data_fine CHECK (
+        (Stato = 'Concluso' AND Data_Fine IS NOT NULL) OR
+        (Stato IN ('In Corso', 'Sospeso', 'Annullato', 'Inizio') AND Data_Fine IS NULL)
+    )
 );
 
--- Table for managing interventions
-CREATE TABLE Intervento (
-    Nome_Officina VARCHAR(50) NOT NULL,
-    Numero_Intervento VARCHAR(10) NOT NULL,
-    Data_Inizio DATE NOT NULL,
-    Data_Fine DATE,
-    Stato stato_intervento NOT NULL,
-    Tentativi INT DEFAULT 0,
-    Targa targa_auto NOT NULL,
-    Costo_orario DECIMAL(10, 2) NOT NULL,
-    Ore_Manodopera OrePositive NOT NULL,
-    Tipologia VARCHAR(50) NOT NULL,
-    PRIMARY KEY (Nome_Officina, Numero_Intervento),
-    FOREIGN KEY (Nome_Officina) REFERENCES Officina(Nome_Officina),
-    FOREIGN KEY (Targa) REFERENCES Automobile(Targa)
-);
+
 
 CREATE TABLE Utilizza (
     Nome_Officina VARCHAR(50) NOT NULL,
     Numero_Intervento VARCHAR(10) NOT NULL,
     Codice_Pezzo VARCHAR(10) NOT NULL,
-    Quantita INT NOT NULL,
+    Quantita INTEGER NOT NULL CHECK (Quantita > 0),
     PRIMARY KEY (Nome_Officina, Numero_Intervento, Codice_Pezzo),
     FOREIGN KEY (Nome_Officina, Numero_Intervento) REFERENCES Intervento(Nome_Officina, Numero_Intervento) ON DELETE CASCADE,
     FOREIGN KEY (Codice_Pezzo) REFERENCES Pezzo_Ricambio(Codice_Pezzo) ON DELETE CASCADE
@@ -259,7 +246,11 @@ CREATE TABLE Fattura (
     Stato VARCHAR(20) NOT NULL CHECK (Stato IN ('Pagata', 'Non Pagata')),
     Data_Pagamento DATE,
     FOREIGN KEY (Nome_Officina, Numero_Intervento) REFERENCES Intervento(Nome_Officina, Numero_Intervento) ON DELETE CASCADE,
-    FOREIGN KEY (Codice_Fiscale) REFERENCES Cliente(Codice_Fiscale)
+    FOREIGN KEY (Codice_Fiscale) REFERENCES Cliente(Codice_Fiscale),
+    CONSTRAINT check_data_pagamento CHECK (
+        (Stato = 'Pagata' AND Data_Pagamento IS NOT NULL) OR
+        (Stato = 'Non Pagata' AND Data_Pagamento IS NULL)
+    )
 );
 
 -- =========================
@@ -325,13 +316,15 @@ INSERT INTO Pezzo_Ricambio (Codice_Pezzo, Nome, Categoria, Costo_Unitario) VALUE
 -- Table for managing supply requests
 CREATE TABLE Richiesta_Fornitura (
     ID_Richiesta SERIAL PRIMARY KEY,
+    Nome_Officina VARCHAR(50) NOT NULL,
+    Numero_Intervento VARCHAR(10) NOT NULL,
     Codice_Pezzo VARCHAR(10) NOT NULL,
-    ID_MG INT NOT NULL,
-    Quantita INT NOT NULL,
-    Stato VARCHAR(20) NOT NULL,
-    Data_Richiesta TIMESTAMP NOT NULL,
+    Quantita INTEGER NOT NULL,
+    Stato VARCHAR(20) NOT NULL DEFAULT 'Non Soddisfatta',
+    Data_Richiesta TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ID_MG VARCHAR(10) NOT NULL,
     FOREIGN KEY (Codice_Pezzo) REFERENCES Pezzo_Ricambio(Codice_Pezzo),
-    FOREIGN KEY (ID_MG) REFERENCES Magazzino(ID_MG)
+    FOREIGN KEY (ID_MG, Nome_Officina) REFERENCES Magazzino(ID_MG, Nome_Officina)
 );
 
 
