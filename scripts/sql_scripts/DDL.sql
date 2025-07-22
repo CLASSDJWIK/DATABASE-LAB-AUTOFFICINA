@@ -186,8 +186,7 @@ CREATE TABLE Fornitore (
     Indirizzo VARCHAR(100) NOT NULL,
     Citta VARCHAR(50) NOT NULL,
     CAP CAP NOT NULL,
-    Telefono Telefono NOT NULL,
-    Prefisso VARCHAR(3) NOT NULL,
+    Prefisso VARCHAR(4) NOT NULL,
     FOREIGN KEY (Prefisso) REFERENCES Nazione(Codice)
 );
 
