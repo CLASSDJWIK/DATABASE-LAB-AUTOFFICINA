@@ -113,21 +113,54 @@ EXECUTE FUNCTION verifica_transizione_stato();
 -- =================== UTILIZZA & SCORTE ===================
 CREATE OR REPLACE FUNCTION trigger_richiesta_pezzo_mancante()
 RETURNS TRIGGER AS $$
-DECLARE q int;
+DECLARE
+    q INT;
+    id_mg_value INTEGER;
 BEGIN
-    SELECT Quantita INTO q FROM Stoccato
-    WHERE Nome_Officina = NEW.Nome_Officina AND Codice_Pezzo = NEW.Codice_Pezzo;
+    RAISE NOTICE 'Inizio del trigger per Officina: %, Intervento: %, Pezzo: %',
+                 NEW.Nome_Officina, NEW.Numero_Intervento, NEW.Codice_Pezzo;
+
+    SELECT Quantita INTO q
+    FROM Stoccato
+    WHERE Nome_Officina = NEW.Nome_Officina
+    AND Codice_Pezzo = NEW.Codice_Pezzo;
+
+    RAISE NOTICE 'Quantità disponibile: %', q;
+
+    -- Ottieni l'ID del magazzino associato all'officina
+    SELECT ID_MG INTO id_mg_value
+    FROM Magazzino
+    WHERE Nome_Officina = NEW.Nome_Officina;
+
+    RAISE NOTICE 'ID Magazzino: %', id_mg_value;
+
     IF q IS NULL OR q < NEW.Quantita THEN
-        UPDATE Intervento SET Stato = 'sospeso'
-        WHERE Nome_Officina = NEW.Nome_Officina AND Numero_Intervento = NEW.Numero_Intervento;
-        INSERT INTO Richiesta_Fornitura
-            (Nome_Officina, Numero_Intervento, Codice_Pezzo, Quantita, Soddisfatta)
-        VALUES
-            (NEW.Nome_Officina, NEW.Numero_Intervento, NEW.Codice_Pezzo, NEW.Quantita, FALSE);
-        RAISE EXCEPTION 'Pezzo mancante — richiesta generata e intervento sospeso!';
+        -- Suspend the intervention
+        RAISE NOTICE 'Aggiornamento dello stato dell''intervento a Sospeso';
+        UPDATE Intervento
+        SET Stato = 'Sospeso'
+        WHERE Nome_Officina = NEW.Nome_Officina
+        AND Numero_Intervento = NEW.Numero_Intervento;
+
+        -- Verifica l'aggiornamento dello stato
+        RAISE NOTICE 'Stato dell''intervento dopo l''aggiornamento: %',
+                     (SELECT Stato FROM Intervento WHERE Nome_Officina = NEW.Nome_Officina AND Numero_Intervento = NEW.Numero_Intervento);
+
+        -- Register the request with a valid id_mg, stato, and data_richiesta
+        RAISE NOTICE 'Inserimento della richiesta di fornitura';
+        INSERT INTO Richiesta_Fornitura (Nome_Officina, Numero_Intervento, Codice_Pezzo, Quantita, ID_MG, Stato, Data_Richiesta)
+        VALUES (NEW.Nome_Officina, NEW.Numero_Intervento, NEW.Codice_Pezzo, NEW.Quantita, id_mg_value, 'Non Soddisfatta', CURRENT_TIMESTAMP);
+
+        -- Verifica l'inserimento della richiesta di fornitura
+        RAISE NOTICE 'Richiesta di fornitura inserita per il pezzo: %', NEW.Codice_Pezzo;
+
+        -- Utilizza RAISE NOTICE invece di RAISE EXCEPTION per evitare di interrompere la transazione
+        RAISE NOTICE 'Pezzo di ricambio non disponibile in quantità sufficiente. Intervento sospeso e richiesta generata.';
     END IF;
     RETURN NEW;
-END; $$ LANGUAGE plpgsql;
+END;
+$$ LANGUAGE plpgsql;
+
 
 CREATE TRIGGER trg_richiesta_pezzo_mancante
 BEFORE INSERT ON Utilizza
