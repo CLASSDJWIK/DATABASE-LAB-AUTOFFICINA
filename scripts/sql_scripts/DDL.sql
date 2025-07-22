@@ -321,7 +321,7 @@ CREATE TABLE Richiesta_Fornitura (
     Quantita INTEGER NOT NULL,
     Stato VARCHAR(20) NOT NULL DEFAULT 'Non Soddisfatta',
     Data_Richiesta TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    ID_MG VARCHAR(10) NOT NULL,
+    ID_MG SERIAL,
     FOREIGN KEY (Codice_Pezzo) REFERENCES Pezzo_Ricambio(Codice_Pezzo),
     FOREIGN KEY (ID_MG, Nome_Officina) REFERENCES Magazzino(ID_MG, Nome_Officina)
 );
