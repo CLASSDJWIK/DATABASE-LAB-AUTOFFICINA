@@ -7,17 +7,12 @@ CREATE DOMAIN AnnoAuto AS INT CHECK (VALUE BETWEEN 1970 AND 2025);
 CREATE DOMAIN Costo AS NUMERIC(10, 2) CHECK (VALUE > 0);
 CREATE DOMAIN OrePositive AS NUMERIC(5, 2) CHECK (VALUE > 0);
 CREATE DOMAIN Targa_Auto AS VARCHAR(7) CHECK (VALUE ~ '^[A-Z]{2}[0-9]{3}[A-Z]{2}$');
-
-CREATE DOMAIN Codice_Fisc AS VARCHAR(16) 
-   CHECK (VALUE ~ '^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[0-9]Z[0-9]{3}$'); 
+CREATE DOMAIN Codice_Fisc AS VARCHAR(16)
+   CHECK (VALUE ~ '^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[0-9]Z[0-9]{3}$');
 CREATE DOMAIN stato_intervento AS VARCHAR(20)
-    CHECK (VALUE IN ('Inizio', 'In Corso', 'Sospeso', 'Annullato', 'Concluso'));
-
+    CHECK (VALUE IN ('Inizio', 'In Corso', 'Sospeso', 'Concluso'));
 CREATE DOMAIN PIVA AS VARCHAR(11) CHECK (VALUE ~ '^[A-Z]{3}[0-9]{5}$');
-
-
-CREATE DOMAIN CAP AS CHAR(5) CHECK (VALUE ~ '^[0-9]{5}$'); 
-
+CREATE DOMAIN CAP AS CHAR(5) CHECK (VALUE ~ '^[0-9]{5}$');
 CREATE DOMAIN stato_fattura AS VARCHAR(20)
     CHECK (VALUE IN ('Pagata', 'Non Pagata'));
 
@@ -138,10 +133,9 @@ CREATE TABLE Automobile (
     Targa Targa_Auto PRIMARY KEY,
     Anno AnnoAuto NOT NULL,
     Modello_Marca VARCHAR(50) NOT NULL,
-    Codice_Fiscale Codice_Fisc NOT NULL
-    Chilometraggio INT NOT NULL
-   FOREIGN KEY (Codice_Fiscale) REFERENCES Cliente(Codice_Fiscale) ON DELETE CASCADE
-
+    Codice_Fiscale Codice_Fisc NOT NULL,
+    Chilometraggio INT NOT NULL,
+    FOREIGN KEY (Codice_Fiscale) REFERENCES Cliente(Codice_Fiscale) ON DELETE CASCADE
 );
 
 
@@ -195,7 +189,7 @@ CREATE TABLE Fornisce (
     Codice_Pezzo VARCHAR(10) NOT NULL,
     Quantita INTEGER NOT NULL CHECK (Quantita > 0),
     Data_Consegna DATE NOT NULL,
-    ID_MG INT NOT NULL,
+    ID_MG INTEGER NOT NULL,
     Nome_Officina VARCHAR(50) NOT NULL,
     PRIMARY KEY (PIVA, Codice_Pezzo, Data_Consegna, ID_MG, Nome_Officina),
     FOREIGN KEY (PIVA) REFERENCES Fornitore(PIVA) ON DELETE CASCADE,
@@ -209,7 +203,7 @@ CREATE TABLE Intervento (
     Targa Targa_Auto NOT NULL,
     Data_Inizio DATE NOT NULL,
     Data_Fine DATE,
-    Stato VARCHAR(20) NOT NULL DEFAULT 'Inizio' CHECK (Stato IN ('Inizio', 'In Corso', 'Sospeso', 'Annullato', 'Concluso')),
+    Stato stato_intervento NOT NULL DEFAULT 'Inizio',
     Tipologia VARCHAR(50) NOT NULL,
     Costo_Orario Costo NOT NULL,
     Ore_Manodopera OrePositive NOT NULL,
@@ -219,7 +213,7 @@ CREATE TABLE Intervento (
     FOREIGN KEY (Targa) REFERENCES Automobile(Targa) ON DELETE CASCADE,
     CONSTRAINT check_stato_data_fine CHECK (
         (Stato = 'Concluso' AND Data_Fine IS NOT NULL) OR
-        (Stato IN ('In Corso', 'Sospeso', 'Annullato', 'Inizio') AND Data_Fine IS NULL)
+        (Stato IN ('In Corso', 'Sospeso', 'Inizio') AND Data_Fine IS NULL)
     )
 );
 
@@ -321,7 +315,7 @@ CREATE TABLE Richiesta_Fornitura (
     Quantita INTEGER NOT NULL,
     Stato VARCHAR(20) NOT NULL DEFAULT 'Non Soddisfatta',
     Data_Richiesta TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    ID_MG SERIAL,
+    ID_MG INTEGER NOT NULL,
     FOREIGN KEY (Codice_Pezzo) REFERENCES Pezzo_Ricambio(Codice_Pezzo),
     FOREIGN KEY (ID_MG, Nome_Officina) REFERENCES Magazzino(ID_MG, Nome_Officina)
 );
