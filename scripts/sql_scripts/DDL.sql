@@ -10,7 +10,7 @@ CREATE DOMAIN Targa_Auto AS VARCHAR(7) CHECK (VALUE ~ '^[A-Z]{2}[0-9]{3}[A-Z]{2}
 CREATE DOMAIN Codice_Fisc AS VARCHAR(16)
    CHECK (VALUE ~ '^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[0-9]Z[0-9]{3}$');
 CREATE DOMAIN stato_intervento AS VARCHAR(20)
-    CHECK (VALUE IN ('Inizio', 'In Corso', 'Sospeso', 'Concluso'));
+    CHECK (VALUE IN ('Inizio', 'In Corso', 'Sospeso', 'Annullato', 'Concluso'));
 CREATE DOMAIN PIVA AS VARCHAR(11) CHECK (VALUE ~ '^[A-Z]{3}[0-9]{5}$');
 CREATE DOMAIN CAP AS CHAR(5) CHECK (VALUE ~ '^[0-9]{5}$');
 CREATE DOMAIN stato_fattura AS VARCHAR(20)
