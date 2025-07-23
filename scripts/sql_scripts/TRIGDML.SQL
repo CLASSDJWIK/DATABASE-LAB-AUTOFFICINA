@@ -364,3 +364,84 @@ BEGIN
     PERFORM riattiva_interventi_pezzi_soddisfatti();
 END;
 $$ LANGUAGE plpgsql;
+
+
+
+CREATE OR REPLACE FUNCTION riattiva_interventi_pezzi_soddisfatti()
+RETURNS VOID AS $$
+DECLARE
+    rec RECORD;
+BEGIN
+    FOR rec IN SELECT * FROM Richiesta_Fornitura WHERE Stato = 'Non Soddisfatta' LOOP
+        -- Verifica se i pezzi sono disponibili nel magazzino
+        PERFORM 1 FROM Stoccato
+        WHERE Nome_Officina = rec.Nome_Officina
+        AND Codice_Pezzo = rec.Codice_Pezzo
+        AND Quantita >= rec.Quantita;
+
+        IF FOUND THEN
+            -- Riattiva l'intervento
+            UPDATE Intervento
+            SET Stato = 'In Corso'
+            WHERE Nome_Officina = rec.Nome_Officina
+            AND Numero_Intervento = rec.Numero_Intervento
+            AND Stato = 'Sospeso';
+
+            -- Marca la richiesta come soddisfatta
+            UPDATE Richiesta_Fornitura
+            SET Stato = 'Soddisfatta'
+            WHERE ID_Richiesta = rec.ID_Richiesta;
+
+            -- Inserisci l'utilizzo del pezzo di ricambio
+            INSERT INTO Utilizza (Nome_Officina, Numero_Intervento, Codice_Pezzo, Quantita)
+            VALUES (rec.Nome_Officina, rec.Numero_Intervento, rec.Codice_Pezzo, rec.Quantita);
+
+            -- Aggiorna lo stato dell'intervento a "Concluso" se tutti i pezzi necessari sono stati utilizzati
+            UPDATE Intervento
+            SET Stato = 'Concluso',
+                Data_Fine = CURRENT_DATE
+            WHERE Nome_Officina = rec.Nome_Officina
+            AND Numero_Intervento = rec.Numero_Intervento;
+        END IF;
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION inserisci_pezzi_necessari()
+RETURNS VOID AS $$
+DECLARE
+    pezzo RECORD;
+    piva_valida VARCHAR(11);
+BEGIN
+    -- Seleziona una PIVA valida dalla tabella Fornitore
+    SELECT PIVA INTO piva_valida
+    FROM Fornitore
+    LIMIT 1;
+
+    FOR pezzo IN SELECT * FROM genera_lista_pezzi_necessari() LOOP
+        -- Inserisci i pezzi nel magazzino con una quantità extra di 15
+        INSERT INTO Fornisce (PIVA, Codice_Pezzo, Quantita, Data_Consegna, ID_MG, Nome_Officina)
+        VALUES (piva_valida, pezzo.Codice_Pezzo, pezzo.Quantita + 15, CURRENT_DATE,
+                (SELECT ID_MG FROM Magazzino WHERE Nome_Officina = pezzo.Nome_Officina),
+                pezzo.Nome_Officina);
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION gestisci_fine_giornata()
+RETURNS VOID AS $$
+BEGIN
+    -- Inserisci i pezzi necessari nel magazzino
+    PERFORM inserisci_pezzi_necessari();
+
+    -- Riattiva gli interventi sospesi
+    PERFORM riattiva_interventi_pezzi_soddisfatti();
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- Esegui la funzione per gestire la fine della giornata
+-- SELECT gestisci_fine_giornata(); --
+
