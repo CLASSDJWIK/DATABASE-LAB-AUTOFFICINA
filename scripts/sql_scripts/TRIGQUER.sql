@@ -1,5 +1,5 @@
 -- =============================================================
--- FILE: DML.sql
+-- FILE: TRIGDML.sql
 -- DESCRIZIONE: Trigger e Funzioni per Database Autofficina
 -- STRUTTURATO PER TABELLA secondo modello E-R
 -- ===========================================================
@@ -136,7 +136,7 @@ BEGIN
     FROM Intervento i
     JOIN Automobile a ON i.Targa = a.Targa
     WHERE i.Nome_Officina = NEW.Nome_Officina
-    AND i.Numero_Intervento = NEW.Numero_Intervento;
+      AND i.Numero_Intervento = NEW.Numero_Intervento;
     IF cf_auto IS DISTINCT FROM NEW.Codice_Fiscale THEN
         RAISE EXCEPTION 'La fattura deve essere associata al cliente proprietario dell''auto';
     END IF;
@@ -156,11 +156,9 @@ DECLARE
     capacita_attuale INT;
     capacita_max INT;
 BEGIN
-    SELECT SUM(Quantita) INTO capacita_attuale
-    FROM Stoccato
+    SELECT SUM(Quantita) INTO capacita_attuale FROM Stoccato
     WHERE ID_MG = NEW.ID_MG AND Nome_Officina = NEW.Nome_Officina;
-    SELECT Capacita INTO capacita_max
-    FROM Magazzino
+    SELECT Capacita INTO capacita_max FROM Magazzino
     WHERE ID_MG = NEW.ID_MG AND Nome_Officina = NEW.Nome_Officina;
     IF capacita_attuale + NEW.Quantita > capacita_max THEN
         RAISE EXCEPTION 'Superata capacità magazzino';
@@ -178,17 +176,11 @@ CREATE OR REPLACE FUNCTION aggiorna_stoccato_dopo_fornisce()
 RETURNS TRIGGER AS $$
 BEGIN
     IF EXISTS (
-        SELECT 1
-        FROM Stoccato
-        WHERE ID_MG = NEW.ID_MG
-        AND Nome_Officina = NEW.Nome_Officina
-        AND Codice_Pezzo = NEW.Codice_Pezzo
+        SELECT 1 FROM Stoccato WHERE ID_MG = NEW.ID_MG AND Nome_Officina = NEW.Nome_Officina AND Codice_Pezzo = NEW.Codice_Pezzo
     ) THEN
         UPDATE Stoccato
         SET Quantita = Quantita + NEW.Quantita
-        WHERE ID_MG = NEW.ID_MG
-        AND Nome_Officina = NEW.Nome_Officina
-        AND Codice_Pezzo = NEW.Codice_Pezzo;
+        WHERE ID_MG = NEW.ID_MG AND Nome_Officina = NEW.Nome_Officina AND Codice_Pezzo = NEW.Codice_Pezzo;
     ELSE
         INSERT INTO Stoccato (ID_MG, Nome_Officina, Codice_Pezzo, Quantita)
         VALUES (NEW.ID_MG, NEW.Nome_Officina, NEW.Codice_Pezzo, NEW.Quantita);
@@ -203,52 +195,91 @@ FOR EACH ROW
 EXECUTE FUNCTION aggiorna_stoccato_dopo_fornisce();
 
 -- =================== FUNZIONE REINTEGRO INTERVENTI SOSPESI ===================
+CREATE OR REPLACE FUNCTION genera_lista_pezzi_necessari()
+RETURNS TABLE (Nome_Officina VARCHAR, Codice_Pezzo VARCHAR, Quantita INTEGER) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT r.Nome_Officina, r.Codice_Pezzo, SUM(r.Quantita)::INTEGER as Quantita
+    FROM Richiesta_Fornitura r
+    WHERE r.Stato = 'Non Soddisfatta'
+    GROUP BY r.Nome_Officina, r.Codice_Pezzo;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION inserisci_pezzi_necessari()
+RETURNS VOID AS $$
+DECLARE
+    pezzo RECORD;
+    piva_valida VARCHAR(11);
+BEGIN
+    FOR pezzo IN SELECT * FROM genera_lista_pezzi_necessari() LOOP
+        -- Seleziona una PIVA valida dalla tabella Fornitore per ogni pezzo
+        SELECT PIVA INTO piva_valida
+        FROM Fornitore
+        ORDER BY RANDOM()
+        LIMIT 1;
+
+        -- Inserisci i pezzi nel magazzino con una quantità extra di 15
+        INSERT INTO Fornisce (PIVA, Codice_Pezzo, Quantita, Data_Consegna, ID_MG, Nome_Officina)
+        VALUES (piva_valida, pezzo.Codice_Pezzo, pezzo.Quantita + 15, CURRENT_DATE,
+                (SELECT ID_MG FROM Magazzino WHERE Nome_Officina = pezzo.Nome_Officina),
+                pezzo.Nome_Officina);
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
 CREATE OR REPLACE FUNCTION riattiva_interventi_pezzi_soddisfatti()
 RETURNS VOID AS $$
 DECLARE
     rec RECORD;
 BEGIN
     FOR rec IN SELECT * FROM Richiesta_Fornitura WHERE Stato = 'Non Soddisfatta' LOOP
-        PERFORM 1
-        FROM Stoccato
+        -- Verifica se i pezzi sono disponibili nel magazzino
+        PERFORM 1 FROM Stoccato
         WHERE Nome_Officina = rec.Nome_Officina
         AND Codice_Pezzo = rec.Codice_Pezzo
         AND Quantita >= rec.Quantita;
+
         IF FOUND THEN
+            -- Riattiva l'intervento
             UPDATE Intervento
             SET Stato = 'In Corso'
             WHERE Nome_Officina = rec.Nome_Officina
             AND Numero_Intervento = rec.Numero_Intervento
             AND Stato = 'Sospeso';
+
+            -- Marca la richiesta come soddisfatta
             UPDATE Richiesta_Fornitura
             SET Stato = 'Soddisfatta'
             WHERE ID_Richiesta = rec.ID_Richiesta;
+
+            -- Inserisci l'utilizzo del pezzo di ricambio
+            INSERT INTO Utilizza (Nome_Officina, Numero_Intervento, Codice_Pezzo, Quantita)
+            VALUES (rec.Nome_Officina, rec.Numero_Intervento, rec.Codice_Pezzo, rec.Quantita);
+
+            -- Aggiorna lo stato dell'intervento a "Concluso" se tutti i pezzi necessari sono stati utilizzati
+            UPDATE Intervento
+            SET Stato = 'Concluso',
+                Data_Fine = CURRENT_DATE
+            WHERE Nome_Officina = rec.Nome_Officina
+            AND Numero_Intervento = rec.Numero_Intervento;
         END IF;
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;
 
--- =================== BATCH: PAGA FATTURE DOPO 1 SETTIMANA ===================
-CREATE OR REPLACE FUNCTION batch_paga_fatture()
+CREATE OR REPLACE FUNCTION gestisci_fine_giornata()
 RETURNS VOID AS $$
-DECLARE
-    fattura RECORD;
 BEGIN
-    FOR fattura IN
-        SELECT Numero_Fattura
-        FROM Fattura
-        WHERE Stato = 'Non Pagata'
-        AND Data_Emissione < (CURRENT_DATE - INTERVAL '7 days')
-        AND random() < 0.5
-    LOOP
-        UPDATE Fattura
-        SET Stato = 'Pagata', Data_Pagamento = CURRENT_DATE
-        WHERE Numero_Fattura = fattura.Numero_Fattura;
-    END LOOP;
+    -- Inserisci i pezzi necessari nel magazzino
+    PERFORM inserisci_pezzi_necessari();
+
+    -- Riattiva gli interventi sospesi
+    PERFORM riattiva_interventi_pezzi_soddisfatti();
 END;
 $$ LANGUAGE plpgsql;
 
--- =================== GESTIONE FLUSSO INTERVENTI ===================
+-- Funzione per calcolare l'importo della fattura
 CREATE OR REPLACE FUNCTION calcola_importo_fattura(p_numero_intervento VARCHAR, p_nome_officina VARCHAR)
 RETURNS DECIMAL(10, 2) AS $$
 DECLARE
@@ -260,18 +291,22 @@ BEGIN
     SELECT i.Costo_Orario INTO costo_orario
     FROM Intervento i
     WHERE i.Numero_Intervento = p_numero_intervento AND i.Nome_Officina = p_nome_officina;
+
     SELECT i.Ore_Manodopera INTO ore_manodopera
     FROM Intervento i
     WHERE i.Numero_Intervento = p_numero_intervento AND i.Nome_Officina = p_nome_officina;
+
     SELECT COALESCE(SUM(p.Costo_Unitario * u.Quantita), 0) INTO costo_pezzi
     FROM Utilizza u
     JOIN Pezzo_Ricambio p ON u.Codice_Pezzo = p.Codice_Pezzo
     WHERE u.Numero_Intervento = p_numero_intervento AND u.Nome_Officina = p_nome_officina;
+
     importo := costo_orario * ore_manodopera + costo_pezzi;
     RETURN importo;
 END;
 $$ LANGUAGE plpgsql;
 
+-- Trigger per gestire il flusso degli interventi
 CREATE OR REPLACE FUNCTION gestisci_flusso_intervento()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -281,12 +316,14 @@ BEGIN
     FROM Stoccato
     WHERE Nome_Officina = NEW.Nome_Officina
     AND Codice_Pezzo = NEW.Codice_Pezzo;
+
     IF q IS NOT NULL AND q >= NEW.Quantita THEN
         UPDATE Intervento
         SET Stato = 'Concluso',
             Data_Fine = CURRENT_DATE
         WHERE Nome_Officina = NEW.Nome_Officina
         AND Numero_Intervento = NEW.Numero_Intervento;
+
         UPDATE Stoccato
         SET Quantita = Quantita - NEW.Quantita
         WHERE Nome_Officina = NEW.Nome_Officina
@@ -301,6 +338,7 @@ AFTER INSERT ON Utilizza
 FOR EACH ROW
 EXECUTE FUNCTION gestisci_flusso_intervento();
 
+-- Trigger per la generazione automatica della fattura
 CREATE OR REPLACE FUNCTION genera_fattura()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -322,6 +360,7 @@ FOR EACH ROW
 WHEN (OLD.Stato IS DISTINCT FROM NEW.Stato AND NEW.Stato = 'Concluso')
 EXECUTE FUNCTION genera_fattura();
 
+-- Trigger per gestire la richiesta di pezzi mancanti
 CREATE OR REPLACE FUNCTION trigger_richiesta_pezzo_mancante()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -332,16 +371,20 @@ BEGIN
     FROM Stoccato
     WHERE Nome_Officina = NEW.Nome_Officina
     AND Codice_Pezzo = NEW.Codice_Pezzo;
+
     SELECT ID_MG INTO id_mg_value
     FROM Magazzino
     WHERE Nome_Officina = NEW.Nome_Officina;
+
     IF q IS NULL OR q < NEW.Quantita THEN
         UPDATE Intervento
         SET Stato = 'Sospeso'
         WHERE Nome_Officina = NEW.Nome_Officina
         AND Numero_Intervento = NEW.Numero_Intervento;
+
         INSERT INTO Richiesta_Fornitura (Nome_Officina, Numero_Intervento, Codice_Pezzo, Quantita, ID_MG, Stato, Data_Richiesta)
         VALUES (NEW.Nome_Officina, NEW.Numero_Intervento, NEW.Codice_Pezzo, NEW.Quantita, id_mg_value, 'Non Soddisfatta', CURRENT_TIMESTAMP);
+
         RAISE WARNING 'Pezzo di ricambio non disponibile in quantità sufficiente. Intervento sospeso e richiesta generata.';
         RETURN NULL;
     END IF;
@@ -353,10 +396,3 @@ CREATE TRIGGER trg_richiesta_pezzo_mancante
 BEFORE INSERT ON Utilizza
 FOR EACH ROW
 EXECUTE FUNCTION trigger_richiesta_pezzo_mancante();
-
-CREATE OR REPLACE FUNCTION gestisci_fine_giornata()
-RETURNS VOID AS $$
-BEGIN
-    PERFORM riattiva_interventi_pezzi_soddisfatti();
-END;
-$$ LANGUAGE plpgsql;
