@@ -1,3 +1,5 @@
+pip install faker
+
 ## Popolazione dati rispettando le regole e la distribuzione per tabelle
 
 import random
