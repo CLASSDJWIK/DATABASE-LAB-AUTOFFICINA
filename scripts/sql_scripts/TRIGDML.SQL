@@ -124,6 +124,62 @@ AFTER INSERT ON Utilizza
 FOR EACH ROW
 EXECUTE FUNCTION aggiorna_quantita_stoccata();
 
+
+CREATE OR REPLACE FUNCTION verifica_disponibilita_pezzi()
+RETURNS TRIGGER AS $$
+DECLARE
+    quantita_stoccata INTEGER;
+BEGIN
+    -- Recupera la quantità stoccata
+    SELECT Quantita INTO quantita_stoccata
+    FROM Stoccato
+    WHERE Nome_Officina = NEW.Nome_Officina AND Codice_Pezzo = NEW.Codice_Pezzo;
+
+    -- Verifica se il pezzo esiste e ha quantità sufficiente
+    IF quantita_stoccata IS NULL THEN
+        -- Pezzo non stoccato: sospende l'intervento e crea una richiesta
+        UPDATE Intervento
+        SET Stato = 'Sospeso'
+        WHERE Nome_Officina = NEW.Nome_Officina AND Numero_Intervento = NEW.Numero_Intervento;
+
+        INSERT INTO Richieste_Fornitura (ID_Richiesta, Nome_Officina, Codice_Pezzo, Quantita, Data_Richiesta, PIVA)
+        VALUES (
+            nextval('richieste_fornitura_id_seq'),
+            NEW.Nome_Officina,
+            NEW.Codice_Pezzo,
+            NEW.Quantita,
+            CURRENT_DATE,
+            (SELECT PIVA FROM Fornitore LIMIT 1) -- Sostituisci con logica per scegliere il fornitore
+        );
+
+        RAISE EXCEPTION 'Pezzo % non disponibile a %: intervento sospeso e richiesta generata.', NEW.Codice_Pezzo, NEW.Nome_Officina;
+    ELSIF quantita_stoccata < NEW.Quantita THEN
+        -- Quantità insufficiente: sospende l'intervento e crea una richiesta
+        UPDATE Intervento
+        SET Stato = 'Sospeso'
+        WHERE Nome_Officina = NEW.Nome_Officina AND Numero_Intervento = NEW.Numero_Intervento;
+
+        INSERT INTO Richieste_Fornitura (ID_Richiesta, Nome_Officina, Codice_Pezzo, Quantita, Data_Richiesta, PIVA)
+        VALUES (
+            nextval('richieste_fornitura_id_seq'),
+            NEW.Nome_Officina,
+            NEW.Codice_Pezzo,
+            NEW.Quantita - quantita_stoccata,
+            CURRENT_DATE,
+            (SELECT PIVA FROM Fornitore LIMIT 1) -- Sostituisci con logica per scegliere il fornitore
+        );
+
+        RAISE EXCEPTION 'Pezzo % disponibile in quantità insufficiente a %: intervento sospeso e richiesta generata.', NEW.Codice_Pezzo, NEW.Nome_Officina;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_verifica_disponibilita
+BEFORE INSERT ON Utilizza
+FOR EACH ROW EXECUTE FUNCTION verifica_disponibilita_pezzi();
+
 -- =================== GESTIONE FATTURE ===================
 
 CREATE OR REPLACE FUNCTION verifica_fattura_cliente()
@@ -189,32 +245,7 @@ EXECUTE FUNCTION aggiorna_stoccato_dopo_fornisce();
 
 -- =================== FUNZIONE REINTEGRO INTERVENTI SOSPESI ===================
 
--- Funzione per riattivare gli interventi sospesi
-CREATE OR REPLACE FUNCTION riattiva_interventi_pezzi_soddisfatti()
-RETURNS VOID AS $$
-DECLARE
-    rec RECORD;
-BEGIN
-    FOR rec IN SELECT * FROM Richiesta_Fornitura WHERE Stato = 'Non Soddisfatta' LOOP
-        PERFORM 1 FROM Stoccato
-        WHERE Nome_Officina = rec.Nome_Officina
-        AND Codice_Pezzo = rec.Codice_Pezzo
-        AND Quantita >= rec.Quantita;
 
-        IF FOUND THEN
-            UPDATE Intervento
-            SET Stato = 'In Corso'
-            WHERE Nome_Officina = rec.Nome_Officina
-            AND Numero_Intervento = rec.Numero_Intervento
-            AND Stato = 'Sospeso';
-
-            UPDATE Richiesta_Fornitura
-            SET Stato = 'Soddisfatta'
-            WHERE ID_Richiesta = rec.ID_Richiesta;
-        END IF;
-    END LOOP;
-END;
-$$ LANGUAGE plpgsql;
 
 -- =================== BATCH: PAGA FATTURE DOPO 1 SETTIMANA ===================
 CREATE OR REPLACE FUNCTION batch_paga_fatture()
@@ -356,14 +387,6 @@ FOR EACH ROW
 EXECUTE FUNCTION trigger_richiesta_pezzo_mancante();
 
 
-
--- Funzione per gestire la fine della giornata
-CREATE OR REPLACE FUNCTION gestisci_fine_giornata()
-RETURNS VOID AS $$
-BEGIN
-    PERFORM riattiva_interventi_pezzi_soddisfatti();
-END;
-$$ LANGUAGE plpgsql;
 
 
 
