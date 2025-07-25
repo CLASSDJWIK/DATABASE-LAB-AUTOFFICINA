@@ -94,3 +94,92 @@ LEFT JOIN Fornisce fn ON
     AND rf.Nome_Officina = fn.Nome_Officina 
     AND rf.ID_MG = fn.ID_MG
 LEFT JOIN Fornitore f ON fn.PIVA = f.PIVA;
+
+--🧾 V1. V_Clienti_Auto_Nazione
+--Clienti, auto associate e nazione dedotta dal codice fiscale
+
+CREATE OR REPLACE VIEW V_Clienti_Auto_Nazione AS
+SELECT 
+  c.Codice_Fiscale,
+  c.Nome,
+  c.Cognome,
+  a.Targa,
+  a.Modello_Marca,
+  n.Nome AS Nazione,
+  n.Continente
+FROM Cliente c
+JOIN Automobile a ON c.Codice_Fiscale = a.Codice_Fiscale
+JOIN Nazione n ON SUBSTRING(c.Codice_Fiscale FROM 13 FOR 4) = n.Codice;
+
+
+--🛠️ V2. V_Interventi_Stato_Fattura
+-- Dettaglio interventi + fatture se già concluse
+CREATE OR REPLACE VIEW V_Interventi_Stato_Fattura AS
+SELECT
+  i.Nome_Officina,
+  i.Numero_Intervento,
+  i.Targa,
+  i.Stato  AS Stato_Intervento,
+  f.Numero_Fattura,
+  f.Importo,
+  f.Stato AS Stato
+FROM Intervento i
+LEFT JOIN Fattura f ON i.Nome_Officina = f.Nome_Officina
+                   AND i.Numero_Intervento = f.Numero_Intervento;
+
+
+--🏪 V3. V_Pezzi_Utilizzati_Totali
+--Pezzi di ricambio usati totali per officina
+
+CREATE OR REPLACE VIEW V_Pezzi_Utilizzati_Totali AS
+SELECT 
+  u.Nome_Officina,
+  u.Codice_Pezzo,
+  p.Nome AS Nome_Pezzo,
+  SUM(u.Quantita) AS Totale_Utilizzati
+FROM Utilizza u
+JOIN Pezzo_Ricambio p ON u.Codice_Pezzo = p.Codice_Pezzo
+GROUP BY u.Nome_Officina, u.Codice_Pezzo, p.Nome;
+
+--🧯 V4. V_Interventi_Sospesi_Richiesta
+--Interventi sospesi con dettaglio della richiesta di pezzi
+
+CREATE OR REPLACE VIEW V_Interventi_Sospesi_Richiesta AS
+SELECT 
+  i.Nome_Officina,
+  i.Numero_Intervento,
+  r.Codice_Pezzo,
+  r.Quantita,
+  r.Stato,
+  r.Data_Richiesta
+FROM Intervento i
+JOIN Richiesta_Fornitura r ON i.Numero_Intervento = r.Numero_Intervento
+WHERE i.Stato = 'Sospeso';
+
+
+--🛒 V5. V_Top_Fornitori
+-- Fornitori che hanno fornito più pezzi in totale
+CREATE OR REPLACE VIEW V_Top_Fornitori AS
+SELECT 
+  f.PIVA,
+  f.Nome,
+  SUM(fr.Quantita) AS Totale_Pezzi_Consegnati 
+FROM Fornitore f
+JOIN Fornisce fr ON f.PIVA = fr.PIVA
+GROUP BY f.PIVA, f.Nome
+ORDER BY Totale_Pezzi_Consegnati DESC;
+
+
+--💰 V6. V_Officine_Fatturato
+-- Fatturato per officina (solo fatture pagate)
+
+CREATE OR REPLACE VIEW V_Officine_Fatturato AS
+SELECT 
+  i.Nome_Officina,
+  SUM(f.Importo) AS Fatturato_Totale
+FROM Fattura f
+JOIN Intervento i ON f.Numero_Intervento = i.Numero_Intervento
+WHERE f.Stato = ' Non Pagata'
+GROUP BY i.Nome_Officina
+ORDER BY Fatturato_Totale DESC;
+
