@@ -1,3 +1,7 @@
+## libreria per generare causalmente dati per le mie regole di popolamento
+pip install faker  
+
+
 import random
 import string
 from faker import Faker
