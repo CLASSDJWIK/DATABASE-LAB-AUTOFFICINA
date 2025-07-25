@@ -183,3 +183,49 @@ WHERE f.Stato = ' Non Pagata'
 GROUP BY i.Nome_Officina
 ORDER BY Fatturato_Totale DESC;
 
+
+
+--- quanti pezzi ci sono in ogni officina
+CREATE OR REPLACE VIEW V_UtilizzoPezziPerOfficinaCrosstab AS
+SELECT *
+FROM crosstab(
+    $$
+    SELECT u.Codice_Pezzo, u.Nome_Officina, COALESCE(SUM(u.Quantita), 0) AS Quantita_Totale
+    FROM Utilizza u
+    GROUP BY u.Codice_Pezzo, u.Nome_Officina
+    ORDER BY u.Codice_Pezzo, u.Nome_Officina
+    $$,
+    $$
+    SELECT DISTINCT Nome_Officina FROM Officina ORDER BY Nome_Officina
+    $$
+) AS pivot (
+    Codice_Pezzo VARCHAR(10),
+    "Officina Adegliaco" INTEGER,
+    "Officina Aquileia" INTEGER,
+    "Officina Azzano Decimo" INTEGER,
+    "Officina Buttrio" INTEGER,
+    "Officina Cervignano del Friuli" INTEGER,
+    "Officina Cividale del Friuli" INTEGER,
+    "Officina Codroipo" INTEGER,
+    "Officina Fagagna" INTEGER,
+    "Officina Gemona" INTEGER,
+    "Officina Gorizia" INTEGER,
+    "Officina Latisana" INTEGER,
+    "Officina Lignano Sabbiadoro" INTEGER,
+    "Officina Maniago" INTEGER,
+    "Officina Monfalcone" INTEGER,
+    "Officina Palmanova" INTEGER,
+    "Officina Pasian di Prato" INTEGER,
+    "Officina Pordenone" INTEGER,
+    "Officina Sacile" INTEGER,
+    "Officina San Daniele del Friuli" INTEGER,
+    "Officina San Giorgio di Nogaro" INTEGER,
+    "Officina San Vito al Tagliamento" INTEGER,
+    "Officina Spilimbergo" INTEGER,
+    "Officina Tarvisio" INTEGER,
+    "Officina Tavagnacco" INTEGER,
+    "Officina Tolmezzo" INTEGER,
+    "Officina Tricesimo" INTEGER,
+    "Officina Trieste" INTEGER,
+    "Officina Udine" INTEGER
+);
