@@ -15,7 +15,7 @@ JOIN Nazione n ON SUBSTRING(c.Codice_Fiscale FROM 13 FOR 4) = n.Codice;
 
 ---Vista 2: Interventi con Geo e ContinenteQuesta vista fornisce dettagli sugli interventi, inclusi città e continente del cliente.---
 
-CREATE OR REPLACE VIEW V_InterventiDettagli AS
+CREATE OR REPLACE VIEW V_InterventiDettaglioi AS
 SELECT
     i.Nome_Officina,
     o.Citta,
@@ -26,12 +26,15 @@ SELECT
     i.Tipologia,
     i.Data_Inizio,
     i.Data_Fine,
-    n.nome AS Nazion
+    i.Costo_Orario,
+    i.Ore_Manodopera,
+    n.Nome AS Nazion
 FROM Intervento i
 JOIN Officina o ON i.Nome_Officina = o.Nome_Officina
 JOIN Automobile a ON i.Targa = a.Targa
 JOIN Cliente c ON a.Codice_Fiscale = c.Codice_Fiscale
 JOIN Nazione n ON SUBSTRING(c.Codice_Fiscale FROM 13 FOR 4) = n.Codice;
+
 
 
 ---Vista 3: Distribuzione Marche Auto per ContinenteQuesta vista mostra la distribuzione delle marche di auto per continente.---
@@ -63,13 +66,15 @@ GROUP BY i.Nome_Officina, o.Citta, i.Stato;
 
 ---Vista 5: Utilizzo Pezzi Ricambio per OfficinaQuesta vista mostra la quantità totale di pezzi usati per officina.---
 
-CREATE OR REPLACE VIEW V_UtilizzoPezziOfficina AS
+CREATE OR REPLACE VIEW V_UtilizzoPezziOfficine AS
 SELECT
     u.Nome_Officina,
     u.Codice_Pezzo,
+    p.Nome AS Nome_Pezzo,
     SUM(u.Quantita) AS Qta_Usata
 FROM Utilizza u
-GROUP BY u.Nome_Officina, u.Codice_Pezzo;
+JOIN Pezzo_Ricambio p ON u.Codice_Pezzo = p.Codice_Pezzo
+GROUP BY u.Nome_Officina, u.Codice_Pezzo, p.Nome;
 
 
 ---Nuova Vista 6: Richieste di Fornitura per Officina Questa nuova vista è specifica per analizzare le Richieste_Fornitura, mostrando i dettagli delle richieste di pezzi per officina, incluso il fornitore e lo stato delle scorte.---
@@ -159,28 +164,31 @@ WHERE i.Stato = 'Sospeso';
 
 
 --🛒 V5. V_Top_Fornitori
--- Fornitori che hanno fornito più pezzi in totale
-CREATE OR REPLACE VIEW V_Top_Fornitori AS
-SELECT 
-  f.PIVA,
-  f.Nome,
-  SUM(fr.Quantita) AS Totale_Pezzi_Consegnati 
-FROM Fornitore f
-JOIN Fornisce fr ON f.PIVA = fr.PIVA
-GROUP BY f.PIVA, f.Nome
-ORDER BY Totale_Pezzi_Consegnati DESC;
+
+
+CREATE OR REPLACE VIEW v_top_fornitori_continenti AS
+SELECT f.Nome AS nome_fornitore,
+       n.Nome AS nazione,
+       n.Continente,
+       SUM(fn.Quantita_Fo) AS totale_pezzi_consegnati
+FROM Fornisce fn
+JOIN Fornitore f ON fn.PIVA = f.PIVA
+JOIN Nazione n ON f.Codice_Nazione = n.Codice
+GROUP BY f.Nome, n.Nome, n.Continente;
+
+
 
 
 --💰 V6. V_Officine_Fatturato
 -- Fatturato per officina (solo fatture pagate)
 
-CREATE OR REPLACE VIEW V_Officine_Fatturato AS
+CREATE OR REPLACE VIEW V_Officine_Fatturati AS
 SELECT 
   i.Nome_Officina,
   SUM(f.Importo) AS Fatturato_Totale
 FROM Fattura f
 JOIN Intervento i ON f.Numero_Intervento = i.Numero_Intervento
-WHERE f.Stato = ' Non Pagata'
+WHERE f.Stato = 'Non Pagata'
 GROUP BY i.Nome_Officina
 ORDER BY Fatturato_Totale DESC;
 
@@ -230,4 +238,3 @@ FROM crosstab(
     "Officina Trieste" INTEGER,
     "Officina Udine" INTEGER
 );
-
