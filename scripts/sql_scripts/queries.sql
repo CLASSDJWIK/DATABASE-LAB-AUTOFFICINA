@@ -1,4 +1,5 @@
----3. Query analitiche significativeLe query fornite nel file DML.sql sono già ben progettate. Le riporto con alcune ottimizzazioni e aggiungo una query specifica per Richieste_Fornitura.Query 1: Numero di auto per continente clientesql
+---3. Query analitiche significativeLe query fornite nel file DML.sql sono già ben progettate. Le riporto con alcune ottimizzazioni e aggiungo una query specifica per Richieste_Fornitura.
+--Query 1: Numero di auto per continente clientesql
 
 SELECT Continente, COUNT(*) AS Numero_Auto
 FROM V_AutoClienteContinente
