@@ -1,7 +1,6 @@
 ---- Vista 1: Auto con Continente ClienteQuesta vista collega ogni automobile al continente del cliente, utile per analisi demografiche.---
 
 
-
 CREATE OR REPLACE VIEW V_AutoClienteContinente AS
 SELECT
     a.Targa,
@@ -9,7 +8,8 @@ SELECT
     a.Anno,
     a.Chilometraggio,
     c.Codice_Fiscale,
-    n.Continente
+    n.Continente,
+    n.nome AS Nazione
 FROM Automobile a
 JOIN Cliente c ON a.Codice_Fiscale = c.Codice_Fiscale
 JOIN Nazione n ON SUBSTRING(c.Codice_Fiscale FROM 13 FOR 4) = n.Codice;
@@ -23,6 +23,7 @@ SELECT
     i.Numero_Intervento,
     c.Nome AS Cliente,
     n.Continente,
+    n.nome AS Nazione,
     i.Stato,
     i.Tipologia,
     i.Data_Inizio,
@@ -39,6 +40,7 @@ JOIN Nazione n ON SUBSTRING(c.Codice_Fiscale FROM 13 FOR 4) = n.Codice;
 CREATE OR REPLACE VIEW V_MarcheAutoCont AS
 SELECT
     n.Continente,
+    n.nome AS Nazione,
     a.Modello_Marca,
     COUNT(*) AS Num_Auto
 FROM Automobile a
@@ -229,3 +231,4 @@ FROM crosstab(
     "Officina Trieste" INTEGER,
     "Officina Udine" INTEGER
 );
+
