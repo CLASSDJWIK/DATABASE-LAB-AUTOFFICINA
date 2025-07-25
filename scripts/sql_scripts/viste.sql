@@ -8,26 +8,25 @@ SELECT
     a.Anno,
     a.Chilometraggio,
     c.Codice_Fiscale,
-    n.Continente,
-    n.nome AS Nazione
+    n.Continente
 FROM Automobile a
 JOIN Cliente c ON a.Codice_Fiscale = c.Codice_Fiscale
 JOIN Nazione n ON SUBSTRING(c.Codice_Fiscale FROM 13 FOR 4) = n.Codice;
 
 ---Vista 2: Interventi con Geo e ContinenteQuesta vista fornisce dettagli sugli interventi, inclusi città e continente del cliente.---
 
-CREATE OR REPLACE VIEW V_InterventiDettaglio AS
+CREATE OR REPLACE VIEW V_InterventiDettagli AS
 SELECT
     i.Nome_Officina,
     o.Citta,
     i.Numero_Intervento,
     c.Nome AS Cliente,
     n.Continente,
-    n.nome AS Nazione,
     i.Stato,
     i.Tipologia,
     i.Data_Inizio,
-    i.Data_Fine
+    i.Data_Fine,
+    n.nome AS Nazion
 FROM Intervento i
 JOIN Officina o ON i.Nome_Officina = o.Nome_Officina
 JOIN Automobile a ON i.Targa = a.Targa
@@ -37,7 +36,7 @@ JOIN Nazione n ON SUBSTRING(c.Codice_Fiscale FROM 13 FOR 4) = n.Codice;
 
 ---Vista 3: Distribuzione Marche Auto per ContinenteQuesta vista mostra la distribuzione delle marche di auto per continente.---
 
-CREATE OR REPLACE VIEW V_MarcheAutoCont AS
+CREATE OR REPLACE VIEW V_MarcheAutoConti AS
 SELECT
     n.Continente,
     n.nome AS Nazione,
@@ -46,7 +45,7 @@ SELECT
 FROM Automobile a
 JOIN Cliente c ON a.Codice_Fiscale = c.Codice_Fiscale
 JOIN Nazione n ON SUBSTRING(c.Codice_Fiscale FROM 13 FOR 4) = n.Codice
-GROUP BY n.Continente, a.Modello_Marca;
+GROUP BY n.Continente, Nazione, a.Modello_Marca;
 
 
 ---Vista 4: Interventi per Officina e StatoQuesta vista riassume il numero di interventi per stato e officina.---
