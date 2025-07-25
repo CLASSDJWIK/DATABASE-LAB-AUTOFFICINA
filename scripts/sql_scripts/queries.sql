@@ -81,4 +81,51 @@ ORDER BY v.Quantita_Stoccata ASC, v.Quantita_Richiesta DESC;
 --Utilità:Identifica le officine con scorte basse (meno di 10 unità) che hanno richieste di fornitura attive.
 --Aiuta a prioritizzare gli ordini di rifornimento.
 
+-- 🧮 2. 6 QUERY DI ANALISI
+--🔹 Q1. Clienti con più auto
 
+
+SELECT Codice_Fiscale, COUNT(*) AS Numero_Auto
+FROM Automobile
+GROUP BY Codice_Fiscale
+ORDER BY Numero_Auto DESC
+LIMIT 5;
+
+
+--🔹 Q2. Officine con più interventi sospesi
+
+SELECT Nome_Officina, COUNT(*) AS Interventi_Sospesi
+FROM Intervento
+WHERE Stato = 'Sospeso'
+GROUP BY Nome_Officina
+ORDER BY Interventi_Sospesi DESC;
+
+--🔹 Q3. Top 3 pezzi richiesti nella tabella Richiesta_Fornitura
+
+SELECT Codice_Pezzo, SUM(Quantita) AS Totale_Richiesto
+FROM Richiesta_Fornitura
+GROUP BY Codice_Pezzo
+ORDER BY Totale_Richiesto DESC
+LIMIT 3;
+
+--🔹 Q4. Statistiche manodopera media per tipologia intervento
+
+SELECT Tipologia, AVG(Ore_Manodopera) AS Ore_Medie
+FROM Intervento
+GROUP BY Tipologia;
+
+--🔹 Q5. Nazionalità più rappresentate dai clienti
+
+SELECT n.Nome AS Nazione, COUNT(*) AS Numero_Clienti
+FROM Cliente c
+JOIN Nazione n ON SUBSTRING(c.Codice_Fiscale FROM 13 FOR 4) = n.Codice
+GROUP BY n.Nome
+ORDER BY Numero_Clienti DESC
+LIMIT 5;
+
+--🔹 Q6. Fornitori attivi con numero forniture superiori a 3
+
+SELECT PIVA, COUNT(*) AS Forniture_Totali
+FROM Fornisce
+GROUP BY PIVA
+HAVING COUNT(*) > 3;
