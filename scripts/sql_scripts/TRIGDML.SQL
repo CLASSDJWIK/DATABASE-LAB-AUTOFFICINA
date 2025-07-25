@@ -340,8 +340,8 @@ BEGIN
         WHERE Nome_Officina = NEW.Nome_Officina
         AND Numero_Intervento = NEW.Numero_Intervento;
 
-        INSERT INTO Richiesta_Fornitura (Nome_Officina, Numero_Intervento, Codice_Pezzo, Quantita, ID_MG, Stato, Data_Richiesta)
-        VALUES (NEW.Nome_Officina, NEW.Numero_Intervento, NEW.Codice_Pezzo, NEW.Quantita, id_mg_value, 'Non Soddisfatta', CURRENT_TIMESTAMP);
+        INSERT INTO Richiesta_Fornitura (Nome_Officina, Numero_Intervento, Codice_Pezzo, Quantita,  Stato, Data_Richiesta, ID_MG)
+        VALUES (NEW.Nome_Officina, NEW.Numero_Intervento, NEW.Codice_Pezzo, NEW.Quantita,  'Non Soddisfatta', CURRENT_TIMESTAMP, id_mg_value);
 
         RAISE WARNING 'Pezzo di ricambio non disponibile in quantità sufficiente. Intervento sospeso e richiesta generata.';
         RETURN NULL;
