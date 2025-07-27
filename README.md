@@ -7,28 +7,7 @@
 
 Questo repository contiene il progetto completo per la gestione di una catena di officine, con implementazione in PostgreSQL e analisi tramite R. Include modellazione concettuale, progettazione logica/fisica, popolamento dati e query analitiche.
 
-## 📁 Struttura del Repository
 
-```
-
-📦 officine-db-project/
-├── modello\_ER.pdf              # Modello E-R (concettuale)
-├── schema\_logico.sql           # Creazione tabelle relazionali
-├── triggers\_funzioni.sql       # Trigger e funzioni di controllo
-├── viste\_analitiche.sql        # Viste SQL per l'analisi
-├── popolamento/                # CSV o script per caricare i dati
-│   ├── clienti.csv
-│   ├── automobili.csv
-│   ├── interventi.csv
-│   └── ...
-├── analisi\_r/                  # Script R e grafici analitici
-│   ├── analisi\_clienti.R
-│   ├── fatturato\_officine.R
-│   ├── ...
-├── dashboard\_shiny/            # (Opzionale) Interfaccia interattiva
-└── README.md                   # Questo file
-
-````
 
 ## 🔧 Tecnologie
 
