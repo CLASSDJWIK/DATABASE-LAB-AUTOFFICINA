@@ -7,6 +7,32 @@
 
 Questo repository contiene il progetto completo per la gestione di una catena di officine, con implementazione in PostgreSQL e analisi tramite R. Include modellazione concettuale, progettazione logica/fisica, popolamento dati e query analitiche.
 
+Il repository contiene:
+
+- `scripts/`: script di creazione tabelle e domini
+- `scripts/sql_scripts/triggers/`: funzioni e trigger PL/pgSQL
+- `scripts/popolamento/`: funzione python per creare i dati
+- `scripts/sql_scripts/viste/`: viste per report e analisi
+- `output/`: Risultati ottenuti e analisi su R
+- `README.md`: documentazione sintetica
+
+# Architettura del Database
+
+- Tabelle principali: `Cliente`, `Automobile`, `Officina`, `Intervento`, `Magazzino`, `Pezzo_Ricambio`, `Fornitore`, `Fattura`
+- Tabelle associative: `Utilizza`, `Fornisce`, `Stoccato`
+- Trigger e funzioni per integrità e automazione
+
+
+
+## Altre Risorse
+
+- [Link al repository GitHub](https://github.com/CLASSDJWIK/DATABASE-LAB-AUTOFFICINA)
+- Documentazione SQL e PL/pgSQL nel folder `triggers`
+- Script R per analisi dati e creazione report
+
+# Session Info
+
+
 
 
 ## 🔧 Tecnologie
