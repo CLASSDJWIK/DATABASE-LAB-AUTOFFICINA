@@ -9,11 +9,13 @@ Questo repository contiene il progetto completo per la gestione di una catena di
 
 Il repository contiene:
 
+- `DB_Lab_Report/`:  MODELLO ER E RELAZIONE DELLA CATENA DI OFFICINE
 - `scripts/`: script di creazione tabelle e domini
 - `scripts/sql_scripts/triggers/`: funzioni e trigger PL/pgSQL
 - `scripts/popolamento/`: funzione python per creare i dati
 - `scripts/sql_scripts/viste/`: viste per report e analisi
 - `output/`: Risultati ottenuti e analisi su R
+- `data_sources/`:  Dati ottenuti dal popolamento
 - `README.md`: documentazione sintetica
 
 # Architettura del Database
