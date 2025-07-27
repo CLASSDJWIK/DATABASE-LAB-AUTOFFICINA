@@ -1,0 +1,85 @@
+
+# Definizione Schema Logico - Database Officina
+
+## 1. Tabelle Principali e Attributi
+
+### Cliente  
+- **PK**: Codice_Fiscale  
+- Attributi: Nome, Cognome, Indirizzo, Citta, CAP, Telefono  
+- Relazioni: un Cliente possiede più Automobili
+
+### Automobile  
+- **PK**: Targa  
+- **FK**: Codice_Fiscale → Cliente(Codice_Fiscale)  
+- Attributi: Anno, Modello_Marca, Chilometraggio  
+- Relazioni: un’Automobile ha molti Interventi
+
+### Officina  
+- **PK**: Nome_Officina  
+- Attributi: Indirizzo, Citta (FK → Citta_FVG), CAP, Telefono, Numero_Interventi (contatore aggiornato da trigger)  
+- Relazioni: un’Officina gestisce molti Interventi, Magazzini, Richieste_Fornitura, Utilizza, Fornisce, Fatture
+
+### Magazzino  
+- **PK composito**: (ID_MG, Nome_Officina)  
+- **FK**: Nome_Officina → Officina(Nome_Officina)  
+- Attributi: Capacita  
+- Relazioni: contiene Stoccato, associato a Fornisce
+
+### Pezzo_Ricambio  
+- **PK**: Codice_Pezzo  
+- Attributi: Nome, Categoria, Costo_Unitario  
+- Relazioni: usato in Utilizza, fornito in Fornisce, stoccato in Stoccato, richiesto in Richiesta_Fornitura
+
+### Intervento  
+- **PK composito**: (Nome_Officina, Numero_Intervento)  
+- **FK**: Nome_Officina → Officina  
+- **FK**: Targa → Automobile  
+- Attributi: Data_Inizio, Data_Fine, Stato (controllato via CHECK e trigger), Tipologia, Costo_Orario, Ore_Manodopera, Descrizione  
+- Relazioni: usa pezzi tramite Utilizza, genera Fattura
+
+### Utilizza  
+- **PK composito**: (Nome_Officina, Numero_Intervento, Codice_Pezzo)  
+- **FK**: (Nome_Officina, Numero_Intervento) → Intervento  
+- **FK**: Codice_Pezzo → Pezzo_Ricambio  
+- Attributi: Quantita (pezzi usati nell’intervento)
+
+### Fattura  
+- **PK**: Numero_Fattura (seriale)  
+- **FK**: (Nome_Officina, Numero_Intervento) → Intervento  
+- **FK**: Codice_Fiscale → Cliente  
+- Attributi: Data_Emissione, Importo, Stato (Pagata/Non Pagata), Data_Pagamento  
+
+### Fornitore  
+- **PK**: PIVA  
+- Attributi: Nome, Indirizzo, Citta, CAP, Telefono
+
+### Fornisce  
+- **PK composito**: (PIVA, Codice_Pezzo, Data_Consegna, ID_MG, Nome_Officina)  
+- **FK**: PIVA → Fornitore  
+- **FK**: Codice_Pezzo → Pezzo_Ricambio  
+- **FK**: (ID_MG, Nome_Officina) → Magazzino  
+- Attributi: Quantita_Fo (quantità fornita)
+
+### Stoccato  
+- **PK composito**: (ID_MG, Nome_Officina, Codice_Pezzo)  
+- **FK**: (ID_MG, Nome_Officina) → Magazzino  
+- **FK**: Codice_Pezzo → Pezzo_Ricambio  
+- Attributi: Quantita_St (pezzi disponibili)
+
+### Richiesta_Fornitura  
+- **PK**: ID_Richiesta  
+- **FK**: Nome_Officina → Officina  
+- **FK**: Codice_Pezzo → Pezzo_Ricambio  
+- **FK**: (ID_MG, Nome_Officina) → Magazzino  
+- Attributi: Quantita, Data_Richiesta  
+- Relazioni: può essere collegata a Intervento (se presente)
+
+## 2. Vincoli e Considerazioni Generali
+
+- **Chiavi Primarie (PK)** definiscono identificatori univoci  
+- **Chiavi Esterne (FK)** garantiscono integrità referenziale fra tabelle  
+- **Vincoli CHECK e domini su colonne**: es. formati Codice_Fiscale, Targa, Stato intervento, numeri positivi  
+- Attributo **Numero_Interventi** in Officina aggiornato automaticamente con trigger all’inserimento/cancellazione interventi  
+- Stati intervento e fattura controllati tramite trigger per garantire transizioni valide e coerenza  
+- Gestione magazzino con trigger che controllano disponibilità e capacità  
+
